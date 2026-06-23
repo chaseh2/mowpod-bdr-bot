@@ -15,8 +15,6 @@ def fetch_feed_details(feed_url):
     try:
         response = requests.get(feed_url, timeout=5)
         root = ET.fromstring(response.content)
-        
-        # Extract feed metadata
         channel = root.find('channel')
         if channel is None:
             return None
@@ -33,10 +31,10 @@ def fetch_feed_details(feed_url):
             "category": category,
             "owner": owner_name
         }
-    except Exception as e:
+    except:
         return None
 
-ddef classify_show(title, author, feed_details):
+def classify_show(title, author, feed_details):
     """Classify based on actual feed content"""
     if not feed_details:
         return {"brand": False, "conf": 0}
@@ -58,35 +56,32 @@ Title: {title}
 Author: {author}
 Description: {feed_details.get('description', '')}
 Owner: {feed_details.get('owner', '')}
-Website: {feed_details.get('link', '')}
 
 INDICATORS TO CHECK:
-1. Company name appears in title or author
+1. Company name in title or author
 2. Words like "Academy", "Realty", "Solutions", "Hub", "Network", "Masters"
 3. Description mentions company services
 4. Official company branding
-5. Author is a company, not a person
 
-IS THIS A BRAND PODCAST? (Yes/No)
-Respond ONLY in JSON: {{"brand": true/false, "conf": 0.0-1.0}}"""
+IS THIS A BRAND PODCAST?
+Respond ONLY JSON: {{"brand": true/false, "conf": 0.0-1.0}}"""
         
         msg = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=50,
             messages=[{"role": "user", "content": prompt}]
         )
-        result = json.loads(msg.content[0].text)
-        return result
-    except Exception as e:
-        print(f"Error: {e}")
+        return json.loads(msg.content[0].text)
+    except:
         return {"brand": False, "conf": 0}
+
 leads = []
 processed = 0
 
 with open("newly_added_feeds.csv", "r") as f:
     reader = csv.DictReader(f)
     for row in reader:
-        if processed >= 50:  # Limit to 50 (API costs)
+        if processed >= 50:
             break
         
         title = row.get("title", "").strip()
@@ -97,12 +92,9 @@ with open("newly_added_feeds.csv", "r") as f:
             continue
         
         processed += 1
-        print(f"[{processed}] Researching: {title}...", end=" ")
+        print(f"[{processed}] {title}...", end=" ")
         
-        # Fetch actual feed
         feed_details = fetch_feed_details(feed_url)
-        
-        # Classify
         result = classify_show(title, author, feed_details)
         
         if result.get("brand") and result.get("conf", 0) > 0.6:
