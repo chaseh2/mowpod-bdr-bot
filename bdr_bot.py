@@ -26,7 +26,7 @@ def classify_show(title, author, generator):
 leads = []
 processed = 0
 
-with open("newlyAddedFeeds24hours.csv", "r") as f:
+with open("newly_added_feeds.csv", "r") as f:
     reader = csv.DictReader(f)
     for row in reader:
         if processed >= 100:  # Limit to 100 for cost
