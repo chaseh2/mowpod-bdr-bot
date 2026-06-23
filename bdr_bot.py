@@ -3,7 +3,8 @@ import json
 from datetime import datetime, timedelta
 import requests
 
-client = anthropic.Anthropic(api_key="YOUR_API_KEY")
+import os
+client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # ============================================
 # STEP 1: Get Recent Feeds from Podcast Index
@@ -15,7 +16,7 @@ def get_recent_podcast_feeds(hours=24, limit=500):
     
     headers = {
         "User-Agent": "mowPod-BDR-Bot",
-        "X-Podcastindex-Auth": "YOUR_API_KEY",  # Get from podcastindex.org
+        "X-Podcastindex-Auth": os.getenv("PODCASTINDEX_API_KEY"),  # Get from podcastindex.org
     }
     
     params = {
