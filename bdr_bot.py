@@ -36,33 +36,50 @@ def fetch_feed_details(feed_url):
     except Exception as e:
         return None
 
-def classify_show(title, author, feed_details):
+ddef classify_show(title, author, feed_details):
     """Classify based on actual feed content"""
     if not feed_details:
         return {"brand": False, "conf": 0}
     
     try:
-        prompt = f"""Is this a BRAND/CORPORATE podcast?
+        prompt = f"""You are a BDR expert identifying brand/corporate podcasts.
 
+DEFINITION: A brand podcast is produced/sponsored by a company to promote their business, services, or brand.
+
+EXAMPLES OF BRAND PODCASTS:
+- "Keller Williams Connect" (real estate company)
+- "Shopify Masters" (Shopify's podcast)
+- "HubSpot's The Hubspot Podcast Network" (HubSpot)
+- "Master Podcast Marketing by Amp 99" (marketing agency)
+- "Based Academy" (education/training company)
+
+PODCAST DATA:
 Title: {title}
 Author: {author}
 Description: {feed_details.get('description', '')}
 Owner: {feed_details.get('owner', '')}
-Category: {feed_details.get('category', '')}
+Website: {feed_details.get('link', '')}
 
-Look for: Company names, brand messaging, marketing language, corporate structure.
+INDICATORS TO CHECK:
+1. Company name appears in title or author
+2. Words like "Academy", "Realty", "Solutions", "Hub", "Network", "Masters"
+3. Description mentions company services
+4. Official company branding
+5. Author is a company, not a person
 
-Respond JSON only: {{"brand": true/false, "conf": 0.0-1.0}}"""
+IS THIS A BRAND PODCAST? (Yes/No)
+Respond ONLY in JSON: {{"brand": true/false, "conf": 0.0-1.0}}"""
         
         msg = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=50,
             messages=[{"role": "user", "content": prompt}]
         )
-        return json.loads(msg.content[0].text)
-    except:
+        result = json.loads(msg.content[0].text)
+        return result
+    except Exception as e:
+        print(f"Error: {e}")
         return {"brand": False, "conf": 0}
-
 leads = []
 processed = 0
 
