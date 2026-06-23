@@ -1,13 +1,13 @@
 def get_recent_podcast_feeds(hours=24, limit=100):
     """Query Podcast Index for recently updated feeds"""
     try:
-        # Try using the API key as basic auth instead
         url = "https://api.podcastindex.org/api/1.0/feeds/recent"
         api_key = os.getenv("PODCASTINDEX_API_KEY")
+        api_secret = os.getenv("PODCASTINDEX_API_SECRET")
         
         headers = {
             "User-Agent": "mowPod-BDR-Bot",
-            "Authorization": f"Bearer {api_key}"
+            "X-Podcastindex-Auth": f"{api_key}:{api_secret}"
         }
         
         params = {"max": limit}
