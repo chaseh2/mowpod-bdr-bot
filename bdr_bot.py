@@ -1,3 +1,5 @@
+import sys
+sys.stdout.flush()
 def get_recent_podcast_feeds(hours=24, limit=100):
     """Query Podcast Index for recently updated feeds"""
     try:
