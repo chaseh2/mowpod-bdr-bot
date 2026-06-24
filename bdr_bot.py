@@ -4,6 +4,7 @@ from datetime import datetime
 import hashlib
 import time
 import os
+from urllib.parse import urlparse
 
 print(f"[{datetime.now()}] Starting automated BDR scan...\n")
 
@@ -39,53 +40,73 @@ try:
     
     df = pd.DataFrame(feeds)
     
-    # Print available columns
-    print(f"Available columns: {list(df.columns)}\n")
-    
 except Exception as e:
     print(f"ERROR: {e}")
     exit(1)
 
 print(f"Processing {len(df)} podcasts...\n")
 
-approved_hosts = ["Acast", "Anchor", "Spotify for Podcasters", "Buzzsprout", "Captivate", "iHeartMedia", "Libsyn", "Megaphone", "Podbean", "Podscribe", "Podsights", "Podtrac", "PRX", "Luminary", "Simplecast", "Spreaker", "Transistor"]
+# Map domain names to approved hosting platforms
+host_mapping = {
+    'anchor.fm': 'Anchor',
+    'podbean.com': 'Podbean',
+    'buzzsprout.com': 'Buzzsprout',
+    'transistor.fm': 'Transistor',
+    'spreaker.com': 'Spreaker',
+    'libsyn.com': 'Libsyn',
+    'megaphone.fm': 'Megaphone',
+    'omnycontent.com': 'Megaphone',
+    'acast.com': 'Acast',
+    'captivate.fm': 'Captivate',
+    'podtrac.com': 'Podtrac',
+    'redcircle.com': 'Spotify for Podcasters',
+    'podsights.podtrac.com': 'Podsights',
+    'simplecast.com': 'Simplecast',
+    'prx.org': 'PRX',
+    'luminary.link': 'Luminary',
+    'podscribe.com': 'Podscribe',
+    'iheartmedia.com': 'iHeartMedia',
+}
 
-# Filter 1: Try to filter by hosting platform - check what columns exist
-if 'generator' in df.columns:
-    host_col = 'generator'
-elif 'type' in df.columns:
-    host_col = 'type'
-else:
-    host_col = None
-    print(f"Warning: No hosting platform column found")
+approved_hosts = set(host_mapping.values())
 
-if host_col:
-    df = df[df[host_col].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
-    print(f"✓ Approved hosts: {len(df)}")
+# Extract domain from URL and map to host
+def get_host_from_url(url):
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        # Remove www. prefix
+        if domain.startswith('www.'):
+            domain = domain[4:]
+        # Check direct match
+        if domain in host_mapping:
+            return host_mapping[domain]
+        # Check if domain contains any of our known hosts
+        for known_domain, host in host_mapping.items():
+            if known_domain in domain:
+                return host
+        return None
+    except:
+        return None
+
+df['host_mapped'] = df['url'].apply(get_host_from_url)
+
+# Filter 1: Approved hosting platforms
+df = df[df['host_mapped'].notna()]
+print(f"✓ Approved hosts: {len(df)}")
 
 # Filter 2: English only
-if 'language' in df.columns:
-    df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
-    print(f"✓ English language: {len(df)}")
+df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
+print(f"✓ English language: {len(df)}")
 
-# Filter 3: Remove multi-feed authors (spam/AI)
-if 'author' in df.columns:
-    author_counts = df['author'].value_counts()
-    multi_feed_authors = author_counts[author_counts > 1].index.tolist()
-    removed_spam = len(multi_feed_authors)
-    df = df[~df['author'].isin(multi_feed_authors)]
-    print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
-
-# Filter 4: Remove blank image or description
-if 'image' in df.columns:
-    df = df[df['image'].fillna('') != '']
-if 'description' in df.columns:
-    df = df[df['description'].fillna('') != '']
+# Filter 3: Remove blank image or description
+df = df[df['image'].fillna('') != '']
+df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
 
-# Keep available columns
-keep_cols = [col for col in ['title', 'author', 'url', 'description', 'generator', 'language', 'image'] if col in df.columns]
-df = df[keep_cols]
+# Keep useful columns
+df = df[['title', 'url', 'description', 'host_mapped', 'language', 'image', 'itunesId']]
+df = df.rename(columns={'host_mapped': 'host'})
 
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
 df.to_csv(output_file, index=False)
