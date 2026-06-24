@@ -7,7 +7,6 @@ import os
 
 print(f"[{datetime.now()}] Starting automated BDR scan...\n")
 
-# Get API credentials from environment
 api_key = os.getenv("PODCASTINDEX_API_KEY")
 api_secret = os.getenv("PODCASTINDEX_API_SECRET")
 
@@ -15,16 +14,10 @@ if not api_key or not api_secret:
     print("ERROR: Missing API credentials")
     exit(1)
 
-# Correct endpoint: /recent/newfeeds
 api_url = "https://api.podcastindex.org/api/1.0/recent/newfeeds"
-
-# Get current timestamp
 auth_date = str(int(time.time()))
-
-# Create SHA1 hash: apiKey + apiSecret + timestamp
 auth_hash = hashlib.sha1(f"{api_key}{api_secret}{auth_date}".encode()).hexdigest()
 
-# Set required headers
 headers = {
     "User-Agent": "mowPod-BDR-Bot/1.0",
     "X-Auth-Date": auth_date,
@@ -38,31 +31,23 @@ try:
     
     if response.status_code != 200:
         print(f"API Error: {response.status_code}")
-        print(f"Response: {response.text[:300]}")
         exit(1)
     
     data = response.json()
     feeds = data.get("feeds", [])
     print(f"✓ Got {len(feeds)} podcasts from API\n")
+    print(f"Processing {len(feeds)} podcasts...\n")
     
-    # Convert to DataFrame
     df = pd.DataFrame(feeds)
     
-    # Debug: print column names
-    print(f"Available columns: {list(df.columns)}\n")
-    
 except Exception as e:
-    print(f"ERROR fetching from API: {e}")
+    print(f"ERROR: {e}")
     exit(1)
 
-print(f"Processing {len(df)} podcasts...\n")
-
-# Approved hosting platforms
 approved_hosts = ["Acast", "Anchor", "Spotify for Podcasters", "Buzzsprout", "Captivate", "iHeartMedia", "Libsyn", "Megaphone", "Podbean", "Podscribe", "Podsights", "Podtrac", "PRX", "Luminary", "Simplecast", "Spreaker", "Transistor"]
 
-# Filter 1: Approved hosts only (try different column names)
-host_col = 'medium' if 'medium' in df.columns else 'type' if 'type' in df.columns else 'generator'
-df = df[df[host_col].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
+# Filter 1: Approved hosts
+df = df[df['generator'].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
 print(f"✓ Approved hosts: {len(df)}")
 
 # Filter 2: English only
@@ -77,18 +62,15 @@ df = df[~df['author'].isin(multi_feed_authors)]
 print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
 
 # Filter 4: Remove blank image or description
-df = df[df['image'].notna() & (df['image'] != '')]
-df = df[df['description'].notna() & (df['description'] != '')]
+df = df[df['image'].fillna('') != '']
+df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
 
 # Keep useful columns
-keep_cols = ['title', 'author', 'url', 'description', 'language', 'image']
-keep_cols = [col for col in keep_cols if col in df.columns]
+keep_cols = ['title', 'author', 'url', 'description', 'generator', 'language', 'image']
 df = df[keep_cols]
 
-# Save qualified leads
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
 df.to_csv(output_file, index=False)
 
 print(f"\n✓ Saved {len(df)} qualified leads to {output_file}")
-print(f"✓ Ready for manual research")
