@@ -1,31 +1,25 @@
 name: Daily BDR Scan
-
 on:
   schedule:
     - cron: '0 8 * * *'
   workflow_dispatch:
-
 jobs:
   run-bdr-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
       - name: Install dependencies
         run: pip install -r requirements.txt
-      
       - name: Run BDR scan
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PODCASTINDEX_API_KEY: ${{ secrets.PODCASTINDEX_API_KEY }}
           PODCASTINDEX_API_SECRET: ${{ secrets.PODCASTINDEX_API_SECRET }}
         run: python bdr_bot.py
-      
       - name: Upload results to artifacts
         uses: actions/upload-artifact@v4
         with:
