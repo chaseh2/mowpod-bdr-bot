@@ -10,7 +10,10 @@ csv_url = "https://public.podcastindex.org/newlyAddedFeeds24hours.csv"
 
 print("Downloading latest podcasts from Podcast Index...")
 try:
-    response = requests.get(csv_url, timeout=30)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    response = requests.get(csv_url, headers=headers, timeout=30)
     response.raise_for_status()
     
     # Read CSV from response
