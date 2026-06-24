@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import hashlib
 import time
-import io
+import os
 
 print(f"[{datetime.now()}] Starting automated BDR scan...\n")
 
@@ -62,4 +62,27 @@ df = df[df['generator'].fillna('').str.contains('|'.join(approved_hosts), case=F
 print(f"✓ Approved hosts: {len(df)}")
 
 # Filter 2: English only
-df = df[df['language'].f
+df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
+print(f"✓ English language: {len(df)}")
+
+# Filter 3: Remove multi-feed authors (spam/AI)
+author_counts = df['author'].value_counts()
+multi_feed_authors = author_counts[author_counts > 1].index.tolist()
+removed_spam = len(multi_feed_authors)
+df = df[~df['author'].isin(multi_feed_authors)]
+print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
+
+# Filter 4: Remove blank image or description
+df = df[df['image'].notna() & (df['image'] != '')]
+df = df[df['description'].notna() & (df['description'] != '')]
+print(f"✓ Complete entries: {len(df)}")
+
+# Keep useful columns
+df = df[['title', 'author', 'feedUrl', 'description', 'generator', 'language', 'image']]
+
+# Save qualified leads
+output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
+df.to_csv(output_file, index=False)
+
+print(f"\n✓ Saved {len(df)} qualified leads to {output_file}")
+print(f"✓ Ready for manual research")
