@@ -36,38 +36,55 @@ try:
     data = response.json()
     feeds = data.get("feeds", [])
     print(f"✓ Got {len(feeds)} podcasts from API\n")
-    print(f"Processing {len(feeds)} podcasts...\n")
     
     df = pd.DataFrame(feeds)
+    
+    # Print available columns
+    print(f"Available columns: {list(df.columns)}\n")
     
 except Exception as e:
     print(f"ERROR: {e}")
     exit(1)
 
+print(f"Processing {len(df)} podcasts...\n")
+
 approved_hosts = ["Acast", "Anchor", "Spotify for Podcasters", "Buzzsprout", "Captivate", "iHeartMedia", "Libsyn", "Megaphone", "Podbean", "Podscribe", "Podsights", "Podtrac", "PRX", "Luminary", "Simplecast", "Spreaker", "Transistor"]
 
-# Filter 1: Approved hosts
-df = df[df['generator'].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
-print(f"✓ Approved hosts: {len(df)}")
+# Filter 1: Try to filter by hosting platform - check what columns exist
+if 'generator' in df.columns:
+    host_col = 'generator'
+elif 'type' in df.columns:
+    host_col = 'type'
+else:
+    host_col = None
+    print(f"Warning: No hosting platform column found")
+
+if host_col:
+    df = df[df[host_col].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
+    print(f"✓ Approved hosts: {len(df)}")
 
 # Filter 2: English only
-df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
-print(f"✓ English language: {len(df)}")
+if 'language' in df.columns:
+    df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
+    print(f"✓ English language: {len(df)}")
 
 # Filter 3: Remove multi-feed authors (spam/AI)
-author_counts = df['author'].value_counts()
-multi_feed_authors = author_counts[author_counts > 1].index.tolist()
-removed_spam = len(multi_feed_authors)
-df = df[~df['author'].isin(multi_feed_authors)]
-print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
+if 'author' in df.columns:
+    author_counts = df['author'].value_counts()
+    multi_feed_authors = author_counts[author_counts > 1].index.tolist()
+    removed_spam = len(multi_feed_authors)
+    df = df[~df['author'].isin(multi_feed_authors)]
+    print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
 
 # Filter 4: Remove blank image or description
-df = df[df['image'].fillna('') != '']
-df = df[df['description'].fillna('') != '']
+if 'image' in df.columns:
+    df = df[df['image'].fillna('') != '']
+if 'description' in df.columns:
+    df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
 
-# Keep useful columns
-keep_cols = ['title', 'author', 'url', 'description', 'generator', 'language', 'image']
+# Keep available columns
+keep_cols = [col for col in ['title', 'author', 'url', 'description', 'generator', 'language', 'image'] if col in df.columns]
 df = df[keep_cols]
 
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
