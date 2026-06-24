@@ -89,11 +89,19 @@ df['host_platform'] = df['url'].apply(get_host_from_url)
 df = df[df['host_platform'].notna()]
 print(f"✓ Approved hosts: {len(df)}")
 
-# Filter 2: English only
+# Filter 2: English language only
 df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
 print(f"✓ English language: {len(df)}")
 
-# Filter 3: Remove blank image or description
+# Filter 3: Remove multi-feed authors (spam/AI)
+if 'author' in df.columns:
+    author_counts = df['author'].value_counts()
+    multi_feed_authors = author_counts[author_counts > 1].index.tolist()
+    removed_spam = len(multi_feed_authors)
+    df = df[~df['author'].isin(multi_feed_authors)]
+    print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
+
+# Filter 4: Remove blank image or description
 df = df[df['image'].fillna('') != '']
 df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
@@ -102,7 +110,7 @@ print(f"✓ Complete entries: {len(df)}")
 if 'timeAdded' in df.columns:
     df['dateAdded'] = pd.to_datetime(df['timeAdded'], unit='s')
 
-# Reorder columns with author first
+# Reorder columns with priority fields first
 priority_cols = ['title', 'author', 'url', 'description', 'host_platform', 'language', 'image', 'dateAdded']
 other_cols = [col for col in df.columns if col not in priority_cols]
 final_cols = [col for col in priority_cols if col in df.columns] + other_cols
