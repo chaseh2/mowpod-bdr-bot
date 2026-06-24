@@ -15,8 +15,8 @@ if not api_key or not api_secret:
     print("ERROR: Missing API credentials")
     exit(1)
 
-# Podcast Index API requires Amazon-style request signing
-api_url = "https://api.podcastindex.org/api/1.0/feeds/recent"
+# Correct endpoint: /recent/newfeeds
+api_url = "https://api.podcastindex.org/api/1.0/recent/newfeeds"
 
 # Get current timestamp
 auth_date = str(int(time.time()))
