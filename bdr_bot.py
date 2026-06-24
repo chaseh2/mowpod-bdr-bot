@@ -99,16 +99,17 @@ df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
 
 # Convert timeAdded to readable datetime
-df['dateAdded'] = pd.to_datetime(df['timeAdded'], unit='s')
+if 'timeAdded' in df.columns:
+    df['dateAdded'] = pd.to_datetime(df['timeAdded'], unit='s')
 
-# Reorder columns - filter fields first, then all others
-filter_cols = ['host_platform', 'language', 'dateAdded']
-other_cols = [col for col in df.columns if col not in filter_cols and col != 'dateAdded']
-df = df[filter_cols + other_cols]
+# Reorder columns with author first
+priority_cols = ['title', 'author', 'url', 'description', 'host_platform', 'language', 'image', 'dateAdded']
+other_cols = [col for col in df.columns if col not in priority_cols]
+final_cols = [col for col in priority_cols if col in df.columns] + other_cols
+df = df[final_cols]
 
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
 df.to_csv(output_file, index=False)
 
 print(f"\n✓ Saved {len(df)} qualified leads to {output_file}")
 print(f"Total columns: {len(df.columns)}")
-print(f"Date range: {df['dateAdded'].min()} to {df['dateAdded'].max()}")
