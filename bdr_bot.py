@@ -68,20 +68,14 @@ host_mapping = {
     'iheartmedia.com': 'iHeartMedia',
 }
 
-approved_hosts = set(host_mapping.values())
-
-# Extract domain from URL and map to host
 def get_host_from_url(url):
     try:
         parsed = urlparse(url)
         domain = parsed.netloc.lower()
-        # Remove www. prefix
         if domain.startswith('www.'):
             domain = domain[4:]
-        # Check direct match
         if domain in host_mapping:
             return host_mapping[domain]
-        # Check if domain contains any of our known hosts
         for known_domain, host in host_mapping.items():
             if known_domain in domain:
                 return host
@@ -89,10 +83,10 @@ def get_host_from_url(url):
     except:
         return None
 
-df['host_mapped'] = df['url'].apply(get_host_from_url)
+df['host_platform'] = df['url'].apply(get_host_from_url)
 
 # Filter 1: Approved hosting platforms
-df = df[df['host_mapped'].notna()]
+df = df[df['host_platform'].notna()]
 print(f"✓ Approved hosts: {len(df)}")
 
 # Filter 2: English only
@@ -104,11 +98,17 @@ df = df[df['image'].fillna('') != '']
 df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
 
-# Keep useful columns
-df = df[['title', 'url', 'description', 'host_mapped', 'language', 'image', 'itunesId']]
-df = df.rename(columns={'host_mapped': 'host'})
+# Convert timeAdded to readable datetime
+df['dateAdded'] = pd.to_datetime(df['timeAdded'], unit='s')
+
+# Reorder columns - filter fields first, then all others
+filter_cols = ['host_platform', 'language', 'dateAdded']
+other_cols = [col for col in df.columns if col not in filter_cols and col != 'dateAdded']
+df = df[filter_cols + other_cols]
 
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
 df.to_csv(output_file, index=False)
 
 print(f"\n✓ Saved {len(df)} qualified leads to {output_file}")
+print(f"Total columns: {len(df.columns)}")
+print(f"Date range: {df['dateAdded'].min()} to {df['dateAdded'].max()}")
