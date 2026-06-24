@@ -2,8 +2,8 @@ name: Daily BDR Scan
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # Runs every day at 8 AM UTC
-  workflow_dispatch:  # Also lets you manually trigger it
+    - cron: '0 8 * * *'
+  workflow_dispatch:
 
 jobs:
   run-bdr-scan:
@@ -23,10 +23,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PODCASTINDEX_API_KEY: ${{ secrets.PODCASTINDEX_API_KEY }}
+          PODCASTINDEX_API_SECRET: ${{ secrets.PODCASTINDEX_API_SECRET }}
         run: python bdr_bot.py
       
       - name: Upload results to artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bdr-leads
-          path: bdr_leads_*.json
+          path: podcast_leads_*.csv
