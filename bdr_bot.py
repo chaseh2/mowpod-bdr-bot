@@ -48,6 +48,9 @@ try:
     # Convert to DataFrame
     df = pd.DataFrame(feeds)
     
+    # Debug: print column names
+    print(f"Available columns: {list(df.columns)}\n")
+    
 except Exception as e:
     print(f"ERROR fetching from API: {e}")
     exit(1)
@@ -57,8 +60,9 @@ print(f"Processing {len(df)} podcasts...\n")
 # Approved hosting platforms
 approved_hosts = ["Acast", "Anchor", "Spotify for Podcasters", "Buzzsprout", "Captivate", "iHeartMedia", "Libsyn", "Megaphone", "Podbean", "Podscribe", "Podsights", "Podtrac", "PRX", "Luminary", "Simplecast", "Spreaker", "Transistor"]
 
-# Filter 1: Approved hosts only
-df = df[df['generator'].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
+# Filter 1: Approved hosts only (try different column names)
+host_col = 'medium' if 'medium' in df.columns else 'type' if 'type' in df.columns else 'generator'
+df = df[df[host_col].fillna('').str.contains('|'.join(approved_hosts), case=False, na=False)]
 print(f"✓ Approved hosts: {len(df)}")
 
 # Filter 2: English only
@@ -78,7 +82,9 @@ df = df[df['description'].notna() & (df['description'] != '')]
 print(f"✓ Complete entries: {len(df)}")
 
 # Keep useful columns
-df = df[['title', 'author', 'feedUrl', 'description', 'generator', 'language', 'image']]
+keep_cols = ['title', 'author', 'url', 'description', 'language', 'image']
+keep_cols = [col for col in keep_cols if col in df.columns]
+df = df[keep_cols]
 
 # Save qualified leads
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
