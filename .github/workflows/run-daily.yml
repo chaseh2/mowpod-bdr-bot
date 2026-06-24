@@ -1,26 +1,107 @@
-name: Daily BDR Scan
+name: Daily BDR Scan & Author Classification
 on:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 8 * * *'  # 8 AM UTC (3 AM EST)
   workflow_dispatch:
+
 jobs:
-  run-bdr-scan:
+  run-bdr-scan-and-classify:
     runs-on: ubuntu-latest
     steps:
+      # =====================================================================
+      # STEP 1: Setup & checkout
+      # =====================================================================
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+      
       - name: Install dependencies
         run: pip install -r requirements.txt
+      
+      # =====================================================================
+      # STEP 2: Run BDR scan (generate podcast_leads_*.csv)
+      # =====================================================================
       - name: Run BDR scan
         env:
           PODCASTINDEX_API_KEY: ${{ secrets.PODCASTINDEX_API_KEY }}
           PODCASTINDEX_API_SECRET: ${{ secrets.PODCASTINDEX_API_SECRET }}
         run: python bdr_bot.py
-      - name: Upload results to artifacts
+      
+      # =====================================================================
+      # STEP 3: Run author classification analysis
+      # =====================================================================
+      - name: Classify authors (corporate vs individual)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python classify_authors.py
+      
+      # =====================================================================
+      # STEP 4: Commit classified CSV back to repo
+      # =====================================================================
+      - name: Commit classified results
+        run: |
+          git config user.name "mowPod BDR Bot"
+          git config user.email "bdr-bot@mowpod.com"
+          
+          # Add classified CSV
+          git add podcast_leads_*_classified.csv
+          
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: Add daily author classification results"
+            git push
+          fi
+      
+      # =====================================================================
+      # STEP 5: Upload raw CSV to artifacts
+      # =====================================================================
+      - name: Upload raw CSV to artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bdr-leads
+          name: bdr-leads-raw
           path: podcast_leads_*.csv
+          retention-days: 30
+      
+      # =====================================================================
+      # STEP 6: Upload classified CSV to artifacts
+      # =====================================================================
+      - name: Upload classified CSV to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bdr-leads-classified
+          path: podcast_leads_*_classified.csv
+          retention-days: 30
+      
+      # =====================================================================
+      # STEP 7: Send email summary
+      # =====================================================================
+      - name: Send CSV via email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'Daily BDR Podcast Leads & Classification - Run #${{ github.run_number }}'
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          body: |
+            Your daily BDR podcast leads and author classification analysis is complete.
+            
+            Both the raw and classified CSVs are attached.
+            
+            Raw CSV: Contains all filtered leads (no classification)
+            Classified CSV: Includes is_corporate column with CORPORATE/INDIVIDUAL designation
+            
+            Check the GitHub issue for detailed statistics.
+            
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          attachments: podcast_leads_*.csv,podcast_leads_*_classified.csv
