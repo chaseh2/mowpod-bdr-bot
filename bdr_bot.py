@@ -40,14 +40,91 @@ try:
     
     df = pd.DataFrame(feeds)
     
-    # DEBUG: Print all columns and check if author exists
-    print(f"Available columns: {list(df.columns)}")
-    print(f"Has 'author' column: {'author' in df.columns}")
-    if 'author' in df.columns:
-        print(f"Non-null authors: {df['author'].notna().sum()}")
-        print(f"Sample authors: {df['author'].dropna().head().tolist()}")
-    print()
-    
 except Exception as e:
     print(f"ERROR: {e}")
     exit(1)
+
+print(f"Processing {len(df)} podcasts...\n")
+
+# Map domain names to approved hosting platforms
+host_mapping = {
+    'anchor.fm': 'Anchor',
+    'podbean.com': 'Podbean',
+    'buzzsprout.com': 'Buzzsprout',
+    'transistor.fm': 'Transistor',
+    'spreaker.com': 'Spreaker',
+    'libsyn.com': 'Libsyn',
+    'megaphone.fm': 'Megaphone',
+    'omnycontent.com': 'Megaphone',
+    'acast.com': 'Acast',
+    'captivate.fm': 'Captivate',
+    'podtrac.com': 'Podtrac',
+    'redcircle.com': 'Spotify for Podcasters',
+    'podsights.podtrac.com': 'Podsights',
+    'simplecast.com': 'Simplecast',
+    'prx.org': 'PRX',
+    'luminary.link': 'Luminary',
+    'podscribe.com': 'Podscribe',
+    'iheartmedia.com': 'iHeartMedia',
+}
+
+def get_host_from_url(url):
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        if domain.startswith('www.'):
+            domain = domain[4:]
+        if domain in host_mapping:
+            return host_mapping[domain]
+        for known_domain, host in host_mapping.items():
+            if known_domain in domain:
+                return host
+        return None
+    except:
+        return None
+
+df['host_platform'] = df['url'].apply(get_host_from_url)
+
+# Filter 1: Approved hosting platforms
+df = df[df['host_platform'].notna()]
+print(f"✓ Approved hosts: {len(df)}")
+
+# Filter 2: English language only
+df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
+print(f"✓ English language: {len(df)}")
+
+# Filter 3: Remove multi-feed authors (spam/AI)
+if 'author' in df.columns:
+    author_counts = df['author'].value_counts()
+    multi_feed_authors = author_counts[author_counts > 1].index.tolist()
+    removed_spam = len(multi_feed_authors)
+    df = df[~df['author'].isin(multi_feed_authors)]
+    print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
+
+# Filter 4: Remove blank image or description
+df = df[df['image'].fillna('') != '']
+df = df[df['description'].fillna('') != '']
+print(f"✓ Complete entries: {len(df)}")
+
+# Filter 5: Remove duplicate descriptions
+description_counts = df['description'].value_counts()
+duplicate_descriptions = description_counts[description_counts > 1].index.tolist()
+removed_dupes = len(duplicate_descriptions)
+df = df[~df['description'].isin(duplicate_descriptions)]
+print(f"✓ Removed {removed_dupes} duplicate descriptions: {len(df)} remaining")
+
+# Convert timeAdded to readable datetime
+if 'timeAdded' in df.columns:
+    df['dateAdded'] = pd.to_datetime(df['timeAdded'], unit='s')
+
+# Reorder columns with priority fields first
+priority_cols = ['title', 'author', 'url', 'description', 'host_platform', 'language', 'image', 'dateAdded']
+other_cols = [col for col in df.columns if col not in priority_cols]
+final_cols = [col for col in priority_cols if col in df.columns] + other_cols
+df = df[final_cols]
+
+output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
+df.to_csv(output_file, index=False)
+
+print(f"\n✓ Saved {len(df)} qualified leads to {output_file}")
+print(f"Total columns: {len(df.columns)}")
