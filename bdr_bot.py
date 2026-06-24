@@ -83,6 +83,12 @@ def get_host_from_url(url):
     except:
         return None
 
+def get_first_three_words(title):
+    if pd.isna(title):
+        return None
+    words = str(title).split()[:3]
+    return ' '.join(words) if words else None
+
 df['host_platform'] = df['url'].apply(get_host_from_url)
 
 # Filter 1: Approved hosting platforms
@@ -93,25 +99,68 @@ print(f"✓ Approved hosts: {len(df)}")
 df = df[df['language'].fillna('').str.lower().str.startswith('en', na=False)]
 print(f"✓ English language: {len(df)}")
 
-# Filter 3: Remove multi-feed authors (spam/AI)
-if 'author' in df.columns:
-    author_counts = df['author'].value_counts()
-    multi_feed_authors = author_counts[author_counts > 1].index.tolist()
-    removed_spam = len(multi_feed_authors)
-    df = df[~df['author'].isin(multi_feed_authors)]
-    print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining")
-
-# Filter 4: Remove blank image or description
+# Filter 3: Remove blank image or description
 df = df[df['image'].fillna('') != '']
 df = df[df['description'].fillna('') != '']
 print(f"✓ Complete entries: {len(df)}")
 
-# Filter 5: Remove duplicate descriptions
+# Filter 4: Remove duplicate descriptions
 description_counts = df['description'].value_counts()
 duplicate_descriptions = description_counts[description_counts > 1].index.tolist()
 removed_dupes = len(duplicate_descriptions)
 df = df[~df['description'].isin(duplicate_descriptions)]
 print(f"✓ Removed {removed_dupes} duplicate descriptions: {len(df)} remaining")
+
+# Filter 5: Keep 1 per group of same first 3 words in title
+df['title_prefix'] = df['title'].apply(get_first_three_words)
+df = df.drop_duplicates(subset=['title_prefix'], keep='first')
+df = df.drop('title_prefix', axis=1)
+print(f"✓ Removed title duplicates (same first 3 words): {len(df)} remaining")
+
+print(f"\nFetching author data for {len(df)} qualified leads...\n")
+
+# Batch-fetch author data via /podcasts/byfeedid
+def get_author_from_api(feed_id):
+    try:
+        auth_date = str(int(time.time()))
+        auth_hash = hashlib.sha1(f"{api_key}{api_secret}{auth_date}".encode()).hexdigest()
+        
+        headers = {
+            "User-Agent": "mowPod-BDR-Bot/1.0",
+            "X-Auth-Date": auth_date,
+            "X-Auth-Key": api_key,
+            "Authorization": auth_hash
+        }
+        
+        url = f"https://api.podcastindex.org/api/1.0/podcasts/byfeedid?id={feed_id}"
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('feed'):
+                return data['feed'].get('author')
+        return None
+    except:
+        return None
+
+# Batch fetch authors with delay to avoid rate limiting
+authors = []
+for idx, feed_id in enumerate(df['id']):
+    author = get_author_from_api(feed_id)
+    authors.append(author)
+    
+    if (idx + 1) % 10 == 0:
+        print(f"  Fetched {idx + 1}/{len(df)} authors...")
+        time.sleep(1)
+
+df['author'] = authors
+
+# Filter 6: Remove multi-feed authors (spam/AI)
+author_counts = df['author'].value_counts()
+multi_feed_authors = author_counts[author_counts > 1].index.tolist()
+removed_spam = len(multi_feed_authors)
+df = df[~df['author'].isin(multi_feed_authors)]
+print(f"✓ Removed {removed_spam} spam creators: {len(df)} remaining\n")
 
 # Convert timeAdded to readable datetime
 if 'timeAdded' in df.columns:
@@ -126,5 +175,5 @@ df = df[final_cols]
 output_file = f"podcast_leads_{datetime.now().strftime('%Y%m%d')}.csv"
 df.to_csv(output_file, index=False)
 
-print(f"\n✓ Saved {len(df)} qualified leads to {output_file}")
+print(f"✓ Saved {len(df)} qualified leads to {output_file}")
 print(f"Total columns: {len(df.columns)}")
