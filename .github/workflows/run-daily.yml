@@ -12,6 +12,15 @@ jobs:
       issues: write
     steps:
       # =====================================================================
+      # STEP 0: Clean up old CSV files
+      # =====================================================================
+      - name: Clean up old CSV files
+        run: |
+          rm -f podcast_leads_*.csv
+          rm -f podcast_leads_*_classified.csv
+          echo "Old files cleaned up"
+
+      # =====================================================================
       # STEP 1: Setup & checkout
       # =====================================================================
       - uses: actions/checkout@v3
