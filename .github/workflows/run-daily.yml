@@ -12,21 +12,21 @@ jobs:
       issues: write
     steps:
       # =====================================================================
-      # STEP 0: Clean up old CSV files
-      # =====================================================================
-      - name: Clean up old CSV files
-        run: |
-          rm -f podcast_leads_*.csv
-          rm -f podcast_leads_*_classified.csv
-          echo "Old files cleaned up"
-
-      # =====================================================================
       # STEP 1: Setup & checkout
       # =====================================================================
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+      
+      # =====================================================================
+      # STEP 2: Clean up old CSV files (AFTER checkout)
+      # =====================================================================
+      - name: Clean up old CSV files
+        run: |
+          rm -f podcast_leads_*.csv
+          rm -f podcast_leads_*_classified.csv
+          echo "Old files cleaned up"
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -37,7 +37,7 @@ jobs:
         run: pip install -r requirements.txt
       
       # =====================================================================
-      # STEP 2: Run BDR scan (generate podcast_leads_*.csv)
+      # STEP 3: Run BDR scan (generate podcast_leads_*.csv)
       # =====================================================================
       - name: Run BDR scan
         env:
@@ -46,7 +46,7 @@ jobs:
         run: python bdr_bot.py
       
       # =====================================================================
-      # STEP 3: Run author classification analysis
+      # STEP 4: Run author classification analysis
       # =====================================================================
       - name: Classify authors (corporate vs individual)
         env:
@@ -55,7 +55,7 @@ jobs:
         run: python classify_authors.py
       
       # =====================================================================
-      # STEP 4: Commit classified CSV back to repo
+      # STEP 5: Commit classified CSV back to repo
       # =====================================================================
       - name: Commit classified results
         run: |
@@ -70,17 +70,7 @@ jobs:
           fi
       
       # =====================================================================
-      # STEP 5: Upload raw CSV to artifacts
-      # =====================================================================
-      - name: Upload raw CSV to artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: bdr-leads-raw
-          path: podcast_leads_*.csv
-          retention-days: 30
-      
-      # =====================================================================
-      # STEP 6: Upload classified CSV to artifacts
+      # STEP 6: Upload classified CSV to artifacts only
       # =====================================================================
       - name: Upload classified CSV to artifacts
         uses: actions/upload-artifact@v4
@@ -90,27 +80,26 @@ jobs:
           retention-days: 30
       
       # =====================================================================
-      # STEP 7: Send email summary
+      # STEP 7: Send email - CLASSIFIED CSV ONLY
       # =====================================================================
-      - name: Send CSV via email
+      - name: Send classified CSV via email
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: 'Daily BDR Podcast Leads & Classification - Run #${{ github.run_number }}'
+          subject: 'Daily BDR Podcast Leads - Run #${{ github.run_number }}'
           to: ${{ secrets.EMAIL_RECIPIENT }}
           from: ${{ secrets.EMAIL_USERNAME }}
           body: |
-            Your daily BDR podcast leads and author classification analysis is complete.
+            Your daily BDR podcast leads with author classification is attached.
             
-            Both the raw and classified CSVs are attached.
-            
-            Raw CSV: Contains all filtered leads (no classification)
-            Classified CSV: Includes is_corporate column with CORPORATE/INDIVIDUAL designation
+            CSV Details:
+            - All rows with blank author or description have been removed
+            - is_corporate column shows: CORPORATE, INDIVIDUAL, or UNKNOWN
             
             Check the GitHub issue for detailed statistics.
             
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          attachments: podcast_leads_*.csv,podcast_leads_*_classified.csv
+          attachments: podcast_leads_*_classified.csv
