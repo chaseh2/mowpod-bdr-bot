@@ -281,7 +281,7 @@ def classify_author(author_name: str) -> str:
 
 def process_csv(csv_path: str) -> Tuple[pd.DataFrame, Dict]:
     """
-    Load CSV, classify authors, and generate statistics.
+    Load CSV, classify authors, remove blank rows, and generate statistics.
     
     Args:
         csv_path: Path to podcast_leads CSV file
@@ -291,7 +291,7 @@ def process_csv(csv_path: str) -> Tuple[pd.DataFrame, Dict]:
         
     Raises:
         FileNotFoundError: If CSV file doesn't exist
-        KeyError: If 'author' column doesn't exist
+        KeyError: If required columns don't exist
     """
     print(f"[{datetime.now()}] Loading CSV: {csv_path}")
     
@@ -303,7 +303,19 @@ def process_csv(csv_path: str) -> Tuple[pd.DataFrame, Dict]:
     if 'author' not in df.columns:
         raise KeyError("'author' column not found in CSV")
     
-    print(f"  Loaded {len(df)} rows")
+    if 'description' not in df.columns:
+        raise KeyError("'description' column not found in CSV")
+    
+    initial_count = len(df)
+    print(f"  Loaded {initial_count} rows")
+    
+    # Remove rows with blank author OR blank description
+    print(f"[{datetime.now()}] Removing rows with blank author or description...")
+    df = df[df['author'].fillna('').str.strip() != '']
+    df = df[df['description'].fillna('').str.strip() != '']
+    removed_blank = initial_count - len(df)
+    print(f"  Removed {removed_blank} blank rows")
+    print(f"  {len(df)} rows remaining")
     
     # Classify each author
     print(f"[{datetime.now()}] Classifying {len(df)} authors...")
@@ -453,7 +465,13 @@ def main():
         print("❌ No podcast_leads_*.csv files found in current directory")
         return 1
     
-    # Use most recent file
+    # Use most recent file (exclude classified versions)
+    csv_files = [f for f in csv_files if '_classified' not in str(f)]
+    
+    if not csv_files:
+        print("❌ No unclassified podcast_leads_*.csv files found")
+        return 1
+    
     csv_path = str(sorted(csv_files)[-1])
     csv_filename = Path(csv_path).name
     
